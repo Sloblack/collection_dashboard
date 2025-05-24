@@ -1,26 +1,41 @@
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import { authService } from './services/api';
-import DashboardOverview from './components/DashboardOverview';
-import UsersManagement from './components/UsersManagement';
-import ContainersManagement from './components/ContainersManagement';
-import RoutesManagement from './components/RoutesManagement';
-import CollectionsManagement from './components/CollectionsManagement';
-import CollectionPointsManagement from './components/CollectionPointsManagement';
-import Login from './components/Login';
 import { useState, useEffect } from 'react';
+import Login from './components/Login';
 
 function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
+    const checkAuth = async () => {
+      try {
+        if (authService.isAuthenticated()) {
+          console.log('Token encontrado'); // Para depuración
+          const currentUser = authService.getCurrentUser();
+          console.log('Usuario actual:', currentUser); // Para depuración
+          if (currentUser && authService.isAdmin()) {
+            console.log('Usuario autenticado como administrador'); // Para depuración
+            setUser(currentUser);
+          } else {
+            console.log('Usuario no es administrador o no está autenticado'); // Para depuración
+            authService.logout();
+          }
+        } else {
+          console.log('No se encontró token'); // Para depuración
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
-  const handleLogin = (loggedInUser) =>{
+  const handleLogin = (loggedInUser) => {
+    console.log('Usuario logueado:', loggedInUser); // Para depuración
     setUser(loggedInUser);
   };
 
@@ -29,11 +44,15 @@ function App() {
     setUser(null);
   };
 
+  if (loading) {
+    return <div>Cargando...</div>;
+  }
+
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
-  return <Dashboard user = {user} onLogout = {handleLogout} />;
+  return <Dashboard user={user} onLogout={handleLogout} />;
 }
 
 export default App;

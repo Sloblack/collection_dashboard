@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Route } from 'lucide-react';
 import PageHeader from './shared/PageHeader';
 import DataTable from './shared/DataTable';
-import { routeService, collectionPointService, containerService } from '../services/api';
+import { routeService, collectionPointService, containerService, userService } from '../services/api';
 
 export default function RoutesManagement() {
   const [routes, setRoutes] = useState([]);
@@ -11,6 +11,8 @@ export default function RoutesManagement() {
   const [editingRoute, setEditingRoute] = useState(null);
   const [isAddContainerModalOpen, setIsAddContainerModalOpen] = useState(false);
   const [selectedRouteForContainer, setSelectedRouteForContainer] = useState(null);
+  const [isEditHourModalOpen, setIsEditHourModalOpen] = useState(false);
+  const [selectedRouteForHour, setSelectedRouteForHour] = useState(null);
 
   useEffect(() => {
     fetchRoutes();
@@ -37,16 +39,36 @@ export default function RoutesManagement() {
     setSelectedRoute(route);
   }
 
-  const handleDeleteRoute = async (routeId) => {
+  const handleDeleteRoute = async (route) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta ruta?')) {
       try {
-        await routeService.delete(routeId);
+        if (route.puntosRecoleccion && route.puntosRecoleccion.length > 0) {
+          for(const punto of route.puntosRecoleccion) {
+            await collectionPointService.delete(punto.punto_ID);
+          }
+        }
+        console.log(route.ruta_ID);
+        await unnasingRoute(route.ruta_ID);
+        await routeService.delete(route.ruta_ID);
         fetchRoutes();
         alert('Ruta eliminada exitosamente');
       } catch (error) {
         console.error('Error deleting route:', error);
         alert('Error al eliminar la ruta');
       }
+    }
+  }
+
+  const unnasingRoute = async (routeId) => {
+    console.log('Unnasing route:', routeId);
+    try {
+      const response = await userService.getUsersRoutes(routeId);
+      const users = response.data;
+      for(const user of users) {
+        await userService.unassignRoute(user.usuario_ID, routeId);
+      }
+    } catch (error) {
+      console.error('Error unnasing route:', error);
     }
   }
 
@@ -86,7 +108,8 @@ export default function RoutesManagement() {
     try {
       const dataToSend = {
         nombre_ruta: routeData.nombre_ruta,
-        descripcion: routeData.descripcion
+        descripcion: routeData.descripcion,
+        hora_actualizacion: routeData.hora_actualizacion,
       };
   
       if (editingRoute) {
@@ -117,6 +140,20 @@ export default function RoutesManagement() {
     } catch (error) {
       console.error('Error adding container to route:', error);
       alert('Error al agregar el contenedor a la ruta');
+    }
+  }
+
+  const handleChangeHour = async (routeId, newHour) => {
+    try {
+      const formattedHour = newHour.padStart(5, '0');
+      await routeService.updateHour(routeId, formattedHour);
+      fetchRoutes();
+      setIsEditHourModalOpen(false);
+      setSelectedRouteForHour(null);
+      alert('Hora de inicio actualizada correctamente');
+    } catch {
+      console.error('Error al actualizar la hora de inicio:', error);
+      alert('Error al actualizar la hora de inicio');
     }
   }
 
@@ -158,11 +195,26 @@ export default function RoutesManagement() {
           </button>
           <button
             className="text-red-600 hover:text-red-800"
-            onClick={() => handleDeleteRoute(row.ruta_ID)}
+            onClick={() => handleDeleteRoute(row)}
           >
             Eliminar
           </button>
         </div>
+      )
+    },
+    {
+      header: 'Horarios',
+      accessor: 'hora_actualizacion',
+      cell: (row) => (
+        <button
+          className="text-blue-600 hover:text-blue-800"
+          onClick={() => {
+            setSelectedRouteForHour(row);
+            setIsEditHourModalOpen(true);
+          }}
+        >
+          {row.hora_actualizacion}
+        </button>
       )
     }
   ];
@@ -238,14 +290,24 @@ export default function RoutesManagement() {
           onAdd={handleAddContainerToRoute}
         />
       )}
+
+      {isEditHourModalOpen && selectedRouteForHour && (
+        <EditHourModal
+        route={selectedRouteForHour}
+        onClose={() => {
+          setIsEditHourModalOpen(false);
+          setSelectedRouteForHour(null);
+        }}
+          onSave={handleChangeHour}
+        />
+      )}
     </div>
   );
 }
 
 function ViewPointsModal({ route, onClose, onDeletePoint }) {
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full content-center
-">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full content-center">
       <div className="relative bottom-20 left-20 mx-auto p-5 border w-3/4 shadow-lg rounded-md bg-white">
         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
           Puntos de Recolección - {route.nombre_ruta}
@@ -255,7 +317,7 @@ function ViewPointsModal({ route, onClose, onDeletePoint }) {
             <thead className="bg-gray-50">
             <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Contenedor</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lugar</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código QR</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código NFC</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -266,7 +328,7 @@ function ViewPointsModal({ route, onClose, onDeletePoint }) {
             {route.puntosRecoleccion.map((punto) => (
                 <tr key={punto.punto_ID}>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{punto.contenedor.contenedor_ID}</td>
-                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{punto.contenedor.ubicacion}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{punto.contenedor.lugar}</td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{punto.contenedor.codigo_QR}</td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{punto.contenedor.codigo_NFC}</td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
@@ -288,7 +350,7 @@ function ViewPointsModal({ route, onClose, onDeletePoint }) {
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md"
           >
             Cerrar
           </button>
@@ -299,7 +361,11 @@ function ViewPointsModal({ route, onClose, onDeletePoint }) {
 }
 
 function RouteFormModal({ route, onClose, onSave }) {
-  const [formData, setFormData] = useState(route || { nombre_ruta: '', descripcion: '' });
+  const [formData, setFormData] = useState(route || {
+    nombre_ruta: '',
+    descripcion: '',
+    hora_actualizacion: route ? route.hora_actualizacion : '00:00'
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -439,6 +505,53 @@ function AddContainerModal({ route, onClose, onAdd }) {
               }`}
             >
               Agregar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditHourModal({ route, onClose, onSave }) {
+  const [newHour, setNewHour] = useState(route.hora_actualizacion);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(route.ruta_ID, newHour);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+          Editar Hora de Actualización
+        </h3>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="hour" className="block text-sm font-medium text-gray-700">Nueva Hora</label>
+            <input
+              type="time"
+              id="hour"
+              value={newHour}
+              onChange={(e) => setNewHour(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              required
+            />
+          </div>
+          <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+            <button
+              type="button"
+              onClick={onClose}
+              className="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded-md"
+            >
+              Guardar
             </button>
           </div>
         </form>

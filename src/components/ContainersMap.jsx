@@ -7,8 +7,8 @@ const containerStyle = {
 };
 
 const center = {
-  lat: 19.766124583044522,
-  lng: -97.24557469903733,
+  lat: 19.817868351758715,//19.817868351758715, -97.36101510185873
+  lng: -97.36101510185873,// Ubicación centro del Teziutlán
 };
 
 const parseLocation = (location) => {
@@ -22,7 +22,7 @@ const libraries = ['marker', 'places'];
 function ContainersMap({ containers }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "AIzaSyC0uhoLZk649N6IDans-HZnZgZ5mmpNa8k",
+    googleMapsApiKey: import.meta.env.VITE_API_KEY_GOOGLE,//"AIzaSyC0uhoLZk649N6IDans-HZnZgZ5mmpNa8k",
     libraries: libraries,
   });
 
@@ -97,11 +97,14 @@ function ContainersMap({ containers }) {
       pinElement.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
       pinElement.style.cursor = 'pointer';
       
+      // Hora de recolección del contenedor
+      const horaRecoleccion = container.ultima_actualizacion.split('T')[1];
       // Crear info window para mostrar al hacer clic
       const infoWindow = new window.google.maps.InfoWindow({
         content: `<div>
           <h3>Contenedor ID: ${container.contenedor_ID}</h3>
           <p>Estado: ${container.estadoRecoleccion ? 'Recolectado' : 'Pendiente'}</p>
+          <p>${container.estadoRecoleccion? horaRecoleccion : 'No hay fecha de recolección'}</p>
         </div>`
       });
       

@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Trash2, Download } from 'lucide-react';
 import PageHeader from './shared/PageHeader';
 import DataTable from './shared/DataTable';
 import { containerService } from '../services/api';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import QRCode from 'react-qr-code';
 
 export default function ContainersManagement() {
   const [containers, setContainers] = useState([]);
   const [editingContainer, setEditingContainer] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedContainerForMap, setSelectedContainerForMap] = useState(null);
 
   useEffect(() => {
     fetchContainers();
@@ -51,6 +54,28 @@ export default function ContainersManagement() {
     }
   };
 
+  const handleDownloadQR = (qrCode) => {
+  const svg = document.getElementById(`qr-${qrCode}`);
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.onload = () => {
+    const margin = 20; // Margen blanco en pixeles
+    canvas.width = img.width + (margin * 2);
+    canvas.height = img.height + (margin * 2);
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, margin, margin, img.width, img.height);
+    const pngFile = canvas.toDataURL("image/png");
+    const downloadLink = document.createElement("a");
+    downloadLink.download = `qr-${qrCode}.png`;
+    downloadLink.href = pngFile;
+    downloadLink.click();
+  };
+  img.src = "data:image/svg+xml;base64," + btoa(svgData);
+};
+
   const handleCreate = async (newContainer) => {
     try {
       await containerService.create(newContainer);
@@ -61,6 +86,10 @@ export default function ContainersManagement() {
       console.error('Error creating container:', error);
       alert('Error al crear el contenedor');
     }
+  };
+
+  const handleViewMap = (container) => {
+    setSelectedContainerForMap(container);
   };
 
   const statusBadge = (status) => (
@@ -74,7 +103,22 @@ export default function ContainersManagement() {
   const columns = [
     { header: 'ID', accessor: 'contenedor_ID' },
     { header: 'Ubicación', accessor: 'ubicacion' },
-    { header: 'Código QR', accessor: 'codigo_QR' },
+    { header: 'Lugar', accessor: 'lugar' },
+    {
+      header: 'Código QR',
+      accessor: 'codigo_QR',
+      cell: (row) => (
+        <div className="flex items-center space-x-2">
+          <span>{row.codigo_QR}</span>
+          <button
+            onClick={() => handleDownloadQR(row.codigo_QR)}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            <Download size={16} />
+          </button>
+        </div>
+      )
+    },
     { header: 'Código NFC', accessor: 'codigo_NFC' },
     {
       header: 'Estado', accessor: 'estadoRecoleccion',  // Agregar la columna 'estadoRecoleccion' al array de columnas y usar esta en la celda para mostrar el estado en badge
@@ -99,6 +143,7 @@ export default function ContainersManagement() {
         <div className="space-x-2">
           <button className="text-blue-600 hover:text-blue-800" onClick={() => handleEdit(row)}>Editar</button>
           <button className="text-red-600 hover:text-red-800" onClick={() => handleDelete(row.contenedor_ID)}>Eliminar</button>
+          <button className="text-green-600 hover:text-green-800" onClick={() => handleViewMap(row)}>Ver en Mapa</button>
         </div>
       )
     }
@@ -136,7 +181,7 @@ export default function ContainersManagement() {
                 <tr key={container.contenedor_ID}>
                   {columns.map((column, index) => (
                     <td key={index} className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {column.cell 
+                      {column.cell
                         ? column.cell(container)
                         : column.accessor.split('.').reduce((obj, key) => obj && obj[key], container)}
                     </td>
@@ -145,6 +190,17 @@ export default function ContainersManagement() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div style={{ height: 0, width: 0, overflow: 'hidden' }}>
+          {containers.map((container) => (
+            <QRCode
+              key={container.contenedor_ID}
+              id={`qr-${container.codigo_QR}`}
+              value={container.codigo_QR}
+              size={256}
+              level="H"
+            />
+          ))}
         </div>
       </div>
       {editingContainer && (
@@ -161,6 +217,13 @@ export default function ContainersManagement() {
           onSave={handleCreate}
         />
       )}
+
+      {selectedContainerForMap && (
+        <MapModal
+          container={selectedContainerForMap}
+          onClose={() => setSelectedContainerForMap(null)}
+        />
+      )}
     </div>
   );
 }
@@ -169,13 +232,18 @@ function CreateContainerModal({ onClose, onSave }) {
   const [newContainer, setNewContainer] = useState({
     ubicacion: '',
     codigo_QR: '',
-    codigo_NFC: ''
+    codigo_NFC: '',
+    lugar: '',
   });
 
   const handleChange = (e) => {
     setNewContainer({ ...newContainer, [e.target.name]: e.target.value });
   };
 
+  const handleLocationSelected = (location) => {
+    setNewContainer({ ...newContainer, ubicacion: location });
+  };
+  
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(newContainer);
@@ -186,6 +254,10 @@ function CreateContainerModal({ onClose, onSave }) {
       <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Crear Nuevo Contenedor</h3>
         <form onSubmit={handleSubmit}>
+          <LocationPicker
+            initialLocation={{ lat: 19.817868229423986, lng: -97.36107140016095 }}//19.817868229423986, -97.36107140016095
+            onLocationSelected={handleLocationSelected}
+          />
           <input
             type="text"
             name="ubicacion"
@@ -193,6 +265,16 @@ function CreateContainerModal({ onClose, onSave }) {
             onChange={handleChange}
             className="mb-2 w-full px-3 py-2 border border-gray-300 rounded-md"
             placeholder="Ubicación"
+            required
+            readOnly
+          />
+          <input
+            type="text"
+            name="lugar"
+            value={newContainer.lugar}
+            onChange={handleChange}
+            className="mb-2 w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Lugar"
             required
           />
           <input
@@ -227,7 +309,8 @@ function EditContainerModal({ container, onClose, onSave }) {
   const [editedContainer, setEditedContainer] = useState({
     ubicacion: container.ubicacion,
     codigo_QR: container.codigo_QR,
-    codigo_NFC: container.codigo_NFC
+    codigo_NFC: container.codigo_NFC,
+    lugar: container.lugar,
   });
 
   const handleChange = (e) => {
@@ -239,11 +322,24 @@ function EditContainerModal({ container, onClose, onSave }) {
     onSave(container.contenedor_ID, editedContainer);
   };
 
+  const handleLocationSelected = (location) => {
+    setEditedContainer({ ...editedContainer, ubicacion: location });
+  };
+
+    const initialLocation = {
+    lat: parseFloat(container.ubicacion.split(' ')[0]),
+    lng: parseFloat(container.ubicacion.split(' ')[1])
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
       <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Editar Contenedor</h3>
         <form onSubmit={handleSubmit}>
+          <LocationPicker
+            initialLocation={initialLocation}
+            onLocationSelected={handleLocationSelected}
+          />
           <input
             type="text"
             name="ubicacion"
@@ -251,6 +347,16 @@ function EditContainerModal({ container, onClose, onSave }) {
             onChange={handleChange}
             className="mb-2 w-full px-3 py-2 border border-gray-300 rounded-md"
             placeholder="Ubicación"
+            required
+            readOnly
+          />
+          <input
+            type="text"
+            name="lugar"
+            value={editedContainer.lugar}
+            onChange={handleChange}
+            className="mb-2 w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Lugar"
             required
           />
           <input
@@ -279,4 +385,89 @@ function EditContainerModal({ container, onClose, onSave }) {
       </div>
     </div>
   );
+}
+
+function MapModal({ container, onClose }) {
+  const libraries = ['marker', 'places'];
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_API_KEY_GOOGLE,
+    libraries: libraries,
+  });
+
+  const containerStyle = {
+    width: '100%',
+    height: '100%'
+  };
+
+  const center = {
+    lat: parseFloat(container.ubicacion.split(' ')[0]),
+    lng: parseFloat(container.ubicacion.split(' ')[1])
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+    <div className="relative p-5 border w-11/12 h-5/6 max-w-4xl shadow-lg rounded-md bg-white">
+      <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Ubicación del Contenedor</h3>
+      <div className="h-5/6">
+        {isLoaded ? (
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={center}
+            zoom={17}
+          >
+            <Marker position={center} />
+          </GoogleMap>
+        ) : (
+          <p>Cargando mapa...</p>
+        )}
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  );
+}
+
+function LocationPicker({ initialLocation, onLocationSelected }) {
+  const [selectedLocation, setSelectedLocation] = useState(initialLocation);
+  const libraries = ['marker', 'places'];
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_API_KEY_GOOGLE,
+    libraries: libraries,
+  });
+
+  const [map, setMap] = useState(null);
+
+  const onLoad = useCallback((map) => {
+    setMap(map);
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    setMap(null);
+  }, []);
+
+  const handleMapClick = (event) => {
+    const lat = event.latLng.lat();
+    const lng = event.latLng.lng();
+    setSelectedLocation({ lat, lng });
+    onLocationSelected(`${lat} ${lng}`);
+  };
+
+  return isLoaded ? (
+    <div style={{ height: '400px', width: '100%' }}>
+      <GoogleMap
+        mapContainerStyle={{ height: '100%', width: '100%' }}
+        center={selectedLocation}
+        zoom={15}
+        onLoad={onLoad}
+        onUnmount={onUnmount}
+        onClick={handleMapClick}
+      >
+        {selectedLocation && <Marker position={selectedLocation} />}
+      </GoogleMap>
+    </div>
+  ) : <div>Cargando mapa...</div>;
 }

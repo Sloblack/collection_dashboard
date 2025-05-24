@@ -41,7 +41,7 @@ const formatDate = (dateString) => {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -66,12 +66,16 @@ const formatDate = (dateString) => {
       accessor: 'contenedor.contenedor_ID'
     },
     {
-      header: 'Ubicación',
-      accessor: 'contenedor.ubicacion'
+      header: 'Lugar',
+      accessor: 'contenedor.lugar'
     },
     {
       header: 'Ruta',
-      accessor: 'contenedor.puntoRecoleccion.ruta.nombre_ruta'
+      accessor: 'contenedor.puntoRecoleccion.ruta.nombre_ruta',
+      cell: (row) => {
+        const rutaNombre = row.contenedor.puntoRecoleccion?.ruta?.nombre_ruta;
+        return rutaNombre || 'Sin ruta asignada';
+      }
     },
     {
       header: 'Acciones',
@@ -93,9 +97,6 @@ const formatDate = (dateString) => {
           <p className="text-gray-500 text-sm">Visualiza el historial de recolecciones</p>
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-          <button className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-            Filtrar
-          </button>
           <button className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
             Exportar
           </button>
@@ -130,7 +131,7 @@ const formatDate = (dateString) => {
           </table>
         </div>
         
-        <div className="px-4 py-4 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between border-t gap-4">
+        {/* <div className="px-4 py-4 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between border-t gap-4">
           <div className="text-sm text-gray-500">
             Mostrando <span className="font-medium">1</span> a <span className="font-medium">4</span> de <span className="font-medium">4</span> resultados
           </div>
@@ -139,7 +140,7 @@ const formatDate = (dateString) => {
             <button className="px-3 py-1 border rounded text-sm text-gray-700 bg-gray-50">1</button>
             <button className="px-3 py-1 border rounded text-sm text-gray-500" disabled>Siguiente</button>
           </div>
-        </div>
+        </div> */}
       </div>
       {selectedCollection && (
         <CollectionDetailsModal
@@ -182,6 +183,7 @@ function CollectionDetailsModal({ collection, onClose }) {
           <p><strong>Contenedor QR:</strong> {collection.contenedor.codigo_QR}</p>
           <p><strong>Contenedor NFC:</strong> {collection.contenedor.codigo_NFC}</p>
           <p><strong>Ubicación:</strong> {collection.contenedor.ubicacion}</p>
+          <p><strong>Lugar:</strong> {collection.contenedor.lugar}</p>
           <p><strong>Ruta:</strong> {collection.contenedor.puntoRecoleccion.ruta.nombre_ruta}</p>
           <p><strong>Descripción de ruta:</strong> {collection.contenedor.puntoRecoleccion.ruta.descripcion}</p>
         </div>

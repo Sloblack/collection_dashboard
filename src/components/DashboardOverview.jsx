@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import React from 'react';
 import { Trash2, Route, Box, Users } from 'lucide-react';
 import { userService, containerService, collectionService, routeService } from '../services/api';
-import ContainersMap from './ContainersMap';  // Add this import
+import ContainersMap from './ContainersMap';
 
 
 function DashboardOverview() {
@@ -13,13 +13,14 @@ function DashboardOverview() {
   const [routes, setRoutes] = useState([]);
   const [recentCollections, setRecentCollections] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
 
   useEffect(() => {
     fetchUsers(),
     fetchContainers(),
     fetchCollections(),
     fetchRoutes()
-  }, [])
+  }, [selectedDate])
 
   const fetchUsers = async () => {
     try {
@@ -42,16 +43,24 @@ function DashboardOverview() {
   const fetchCollections = async () => {
     try {
       const response = await collectionService.getAll();
-      const sortedCollections = response.data.sort((a, b) =>
+      const filteredCollections = response.data.filter(collection => {
+        const collectionDate = new Date(collection.fecha_recoleccion);
+        return collectionDate.toLocaleDateString('en-CA') === selectedDate;
+      }
+      );
+      const sortedCollections = filteredCollections.sort((a, b) =>
         b.recoleccion_ID - a.recoleccion_ID
       );
       setCollections(sortedCollections);
       setRecentCollections(sortedCollections.slice(0, 10)); // Mostrar solo las 10 más recientes
     } catch (error) {
-      console.error('Error fetching collections:', error);
+      console.error('Error fetching collections:', error);s
     }
   };
 
+  const handleDateChange = (event) => {
+    setSelectedDate(event.target.value);
+  }
 
   const fetchRoutes = async () => {
     try {
@@ -78,18 +87,27 @@ function DashboardOverview() {
     }
   }, [containers, selectedRoute]);
 
+  const countCollectedContainers = (containers, date) => {
+    return containers.filter(container => {
+      const containerCollections = collections.filter(collection =>
+        collection.contenedor.contenedor_ID === container.contenedor_ID &&
+        new Date(collection.fecha_recoleccion).toISOString().split('T')[0] === date);
+      return containerCollections.length > 0;
+    }).length;
+  };
 
   const stats = [
+    { title: 'Contenedores recolectados', value: `${countCollectedContainers(filteredContainers, selectedDate)}/${filteredContainers.length}`, icon: <Trash2 size={24} />, color: 'bg-green-500' },
+    { title: 'Recolecciones', value: collections.length, icon: <Box size={24} />, color: 'bg-yellow-500' },
     { title: 'Contenedores Totales', value: containers.length, icon: <Trash2 size={24} />, color: 'bg-blue-500' },
     { title: 'Rutas', value: routes.length, icon: <Route size={24} />, color: 'bg-green-500' },
-    { title: 'Recolecciones', value: collections.length, icon: <Box size={24} />, color: 'bg-yellow-500' },
-    { title: 'Usuarios', value: users.length, icon: <Users size={24} />, color: 'bg-purple-500' }
+    { title: 'Usuarios', value: users.length, icon: <Users size={24} />, color: 'bg-purple-500' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
         {stats.map((stat, index) => (
           <div key={index} className="bg-white rounded-lg shadow p-4 sm:p-6">
             <div className="flex items-center">
@@ -103,6 +121,17 @@ function DashboardOverview() {
             </div>
           </div>
         ))}
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center grid grid-rows-2 text-gray-500 text-sm font-medium"> Filtrar por fecha
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={handleDateChange}
+              className="border border-gray-300 rounded-md px-3 py-2 mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+        </div>
+        </div>
+        
       </div>
       
       {/* Map Section */}
@@ -115,12 +144,12 @@ function DashboardOverview() {
             onChange={(e) => setSelectedRoute(e.target.value)}
           >
             <option value="all">Todas las rutas</option>
-            <option value="unassigned">Sin ruta asignada</option>
             {routes.map((route) => (
               <option key={route.ruta_ID} value={route.ruta_ID}>
                 {route.nombre_ruta}
               </option>
             ))}
+            <option value="unassigned">Sin ruta asignada</option>
           </select>
         </div>
         
@@ -130,7 +159,7 @@ function DashboardOverview() {
       {/* Recent Collections */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 sm:p-6 border-b">
-          <h3 className="text-lg font-medium">Recolecciones Recientes</h3>
+          <h3 className="text-lg font-medium">Recolecciones {selectedDate}</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -141,7 +170,7 @@ function DashboardOverview() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recolector</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contenedor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lugar</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ruta</th>
               </tr>
             </thead>
@@ -156,7 +185,7 @@ function DashboardOverview() {
                         month: '2-digit',
                         day: '2-digit',
                         hour: '2-digit',
-                        minute: '2-digit'
+                        minute: '2-digit',
                       }
                     )}
                   </td>
@@ -169,11 +198,11 @@ function DashboardOverview() {
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{collection.usuario.nombre}</td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{collection.contenedor.contenedor_ID}</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{collection.contenedor.ubicacion}</td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{collection.contenedor.lugar}</td>
                   
                   
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {collection.contenedor.puntoRecoleccion?.ruta?.nombre_ruta || 'Sin ruta'}
+                    {collection.contenedor.puntoRecoleccion?.ruta?.nombre_ruta || 'Sin ruta asignada'}
                   </td>
                 </tr>
               ))}

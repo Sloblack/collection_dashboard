@@ -26,6 +26,7 @@ export default function Login({ onLogin }) {
       }
       else {
         setError('No tienes permisos para acceder a esta sección.');
+        authService.logout();
       }
     } catch (error) {
       setError('Error al iniciar sesión. Por favor, verifica tus credenciales.');

@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { Search, Trash2, Users, Map, Route, Box, BarChart2, Bell, Menu, X, LogOut } from 'lucide-react';
+import { Search, Trash2, Users, Map, Route, Box, BarChart2, Bell, Menu, X, LogOut, CircleX } from 'lucide-react';
 import MenuItem from './MenuItem';
 import DashboardOverview from './DashboardOverview';
 import UsersManagement from './UsersManagement';
 import ContainersManagement from './ContainersManagement';
 import RoutesManagement from './RoutesManagement';
 import CollectionsManagement from './CollectionsManagement';
-import CollectionPointsManagement from './CollectionPointsManagement';
 import getPageTitle from './shared/getPageTitle';
 
 export default function Dashboard({ user, onLogout }) {
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [usuario, setUsuario] = useState(null);
 
   const handleLogout = () => {
     onLogout();
@@ -29,8 +29,6 @@ export default function Dashboard({ user, onLogout }) {
         return <RoutesManagement />;
       case 'collections':
         return <CollectionsManagement />;
-      // case 'collectionPoints':
-      //   return <CollectionPointsManagement />;
       default:
         return <DashboardOverview />;
     }
@@ -93,23 +91,16 @@ export default function Dashboard({ user, onLogout }) {
           </ul>
         </nav>
         
-        {/* User Profile */}
         <div className="p-4 border-t border-stone-300">
-          <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
-              A
-            </div>
-            <div className="ml-3">
-              <p className="font-medium">Administrador</p>
-              <p className="text-xs text-gray-500"></p>
-            </div>
-            <button
-              className="ml-auto text-gray-500 hover:text-red-500"
+          <ul>
+            <MenuItem
+              icon = {<LogOut size={20} />}
+              text="Cerrar sesión"
+              active={false}
               onClick={handleLogout}
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
+            />
+          </ul>
+            
         </div>
       </div>
       
@@ -122,6 +113,19 @@ export default function Dashboard({ user, onLogout }) {
           </div>
           <div className="w-full md:w-auto flex flex-col sm:flex-row items-center gap-4">
           </div>
+
+          <div className="p-4 border-t border-stone-300">
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
+              A
+            </div>
+            <div className="ml-3">
+              <p className="font-medium">{user.nombre}</p>
+              <p className="text-xs text-gray-500"></p>
+            </div>
+            
+          </div>
+        </div>
         </header>
         
         {/* Page Content */}

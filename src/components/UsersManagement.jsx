@@ -36,6 +36,7 @@ export default function UsersManagement() {
         console.error('No se puede actualizar el usuario: ID no definido');
         return;
       }
+      console.log('Intentando actualizar usuario:', {editedUser });
       await userService.update(editingUser.usuario_ID, editedUser);
       setEditingUser(null);
       fetchUsers();
@@ -152,7 +153,7 @@ export default function UsersManagement() {
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{user.telefono}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      user.rol === 'administrador' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                      user.rol === 'administrador' ? 'bg-purple-100 text-purple-800' : user.rol === 'recolector' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                     }`}>
                       {user.rol.charAt(0).toUpperCase() + user.rol.slice(1)}
                     </span>

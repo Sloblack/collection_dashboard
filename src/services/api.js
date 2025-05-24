@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/',
+  baseURL: import.meta.env.VITE_API_URL,//'http://localhost:3000/',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,6 +12,7 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Token stored');
     }
     return config;
   },
@@ -20,15 +21,14 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Servicios para cada entidad
-
 // Servicio de Autenticación
 export const authService = {
   login: async (credentials) => {
     const response = await apiClient.post('/auth/login', credentials);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
+    if (response.data.accessToken) {
+      localStorage.setItem('token', response.data.accessToken);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      console.log('Token stored', response.data.accessToken);
     }
     return response.data;
   },
@@ -39,9 +39,16 @@ export const authService = {
   register: async (userData) => {
     return await apiClient.post('/auth/register', userData);
   },
+
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch (e) {
+      console.error("Error parsing user data:", e);
+      return null;
+    }
   },
   isAuthenticated: () => {
     return !!localStorage.getItem('token');
@@ -49,6 +56,21 @@ export const authService = {
   isAdmin: () => {
     const user = authService.getCurrentUser();
     return user && user.rol === 'administrador';
+  },
+  getProfile: async () => {
+    try {
+      const response = await apiClient.get('/auth/profile');
+      if (response.status === 200 || response.status === 201) {
+        return true;
+      }
+    } catch (error) {
+      if (error.response && error.response.status === 401) {
+        authService.logout();
+        return false;
+        //throw new Error('Sesión expirada, por favor inicia sesión nuevamente.');
+      }
+      throw error;
+    }
   }
 };
 
@@ -85,7 +107,7 @@ export const userService = {
   getAssignedRoutes: async (id) => {
     return await apiClient.get(`/usuarios/${id}/rutas`);
   },
-  getUsersroutes: async (routeId) => {
+  getUsersRoutes: async (routeId) => {
     return await apiClient.get(`/usuarios/${routeId}/usuarios`);
   },
   getUserColletions: async (id) => {
@@ -138,6 +160,9 @@ export const routeService = {
   },
   delete: async (id) => {
     return await apiClient.delete(`/rutas/${id}`);
+  },
+  updateHour: async (id, hour) => {
+    return await apiClient.patch(`/rutas/${id}/cambiar_hora/${hour}`);
   }
 };
 
