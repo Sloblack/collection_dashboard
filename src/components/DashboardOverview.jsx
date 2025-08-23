@@ -91,7 +91,8 @@ function DashboardOverview() {
     return containers.filter(container => {
       const containerCollections = collections.filter(collection =>
         collection.contenedor.contenedor_ID === container.contenedor_ID &&
-        new Date(collection.fecha_recoleccion).toISOString().split('T')[0] === date);
+        //new Date(collection.fecha_recoleccion).toISOString().split('T')[0] === date);
+        new Date(collection.fecha_recoleccion).toLocaleDateString('en-CA') === date);
       return containerCollections.length > 0;
     }).length;
   };

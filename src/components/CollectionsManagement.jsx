@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, X } from 'lucide-react';
 import { collectionService } from '../services/api';
+import * as XLSX from 'xlsx';
 
 export default function CollectionsManagement() {
   const [collections, setCollections] = useState([]);
@@ -89,6 +90,25 @@ const formatDate = (dateString) => {
     }
   ];
 
+  const exportToExcel = () => {
+    const workbook = XLSX.utils.book_new();
+
+    const data = collections.map(collection => ({
+      'Recoleccion ID': collection.recoleccion_ID,
+      'Fecha': collection.fecha_recoleccion,
+      'Método': collection.metodo_recoleccion,
+      'Recolector': collection.usuario.nombre,
+      'QR': collection.contenedor.codigo_QR,
+      'NFC': collection.contenedor.codigo_NFC,
+      'Ubicación': collection.contenedor.ubicacion,
+      'Lugar': collection.contenedor.lugar,
+      'Ruta': collection.contenedor.puntoRecoleccion?.ruta?.nombre_ruta || 'Sin ruta asignada',
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Recolecciones');
+    XLSX.writeFile(workbook, 'Recolecciones.xlsx')
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -97,7 +117,8 @@ const formatDate = (dateString) => {
           <p className="text-gray-500 text-sm">Visualiza el historial de recolecciones</p>
         </div>
         <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-          <button className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+          <button onClick={exportToExcel}
+          className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
             Exportar
           </button>
         </div>
